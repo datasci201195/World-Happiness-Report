@@ -1,2 +1,2 @@
 # World-Happiness-Report
-Data science project on Happiness Index and 2015 Global Openness Index 
+Data science project on Happiness Index and 2017 Global Openness Index 
