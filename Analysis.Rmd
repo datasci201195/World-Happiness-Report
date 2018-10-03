@@ -1,0 +1,162 @@
+---
+title: '"Is Happiness correlated with openness of data?"'
+author: "Rupesh Patel"
+date: "2 October 2018"
+output: 
+    html_document:
+    toc : true
+    fig_width: 12
+    fig_height: 8
+    theme: spacelab
+    highlight: kate
+---
+
+###Introduction
+
+In this kernal,I will also add another dataset.we will have a look at whether goverments adopt open policies with respect to data sharing are the same countries that score highly on the world happiness index.
+
+Let us hypothesize that two are correlated with each other.so another data I will be using is "2015 global open data Index".The World Happiness Report is a landmark survey of the state of global happiness
+
+###Getting Started with data exploration
+
+```{r,message= F,warning= F}
+
+#Necessary Packages
+
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(formattable)
+library(ggthemes)
+library(corrplot)
+
+
+#Importing data set
+
+happiness <- read.csv('2017.csv',stringsAsFactors = F)
+openness  <- read.csv('countries.csv',stringsAsFactors = F)
+
+
+#Exploring data set
+
+str(happiness)
+str(openness)
+
+#To check for unique rows using pipe operator
+happiness %>%
+group_by(Country) %>%
+mutate(n = n()) %>%
+filter(n > 1)
+
+openness %>%
+group_by(Country.Name) %>%
+mutate(n = n()) %>%
+filter(n > 1)
+
+#correcting error for Russia country
+openness$Country.Name[62] <- "Russia"
+
+#changing coloum names
+
+colnames(openness)[2] <- "Country"
+
+#Joining two data table by "Country"
+
+open_happy <- happiness %>%
+              left_join(openness,by = "Country") %>%
+              mutate(Country = factor(Country)) %>%
+              select(Country,Happiness.Score,X2015.Score,Economy..GDP.per.Capita.,Family,Health..Life.Expectancy.,Freedom,Generosity,Trust..Government.Corruption.,Dystopia.Residual)
+
+#changine Colnames to better names
+
+colnames(open_happy) <- c("country","happiness","openness","gdp","family","health","freedom","generosity","goverment","dyst_residual")
+
+
+#checking NAs for `openness`
+sum(is.na(open_happy$openness))
+```
+
+Now that I have the data roughly how I want it, let's have a quick peek. I really like this package called [`formattable`](https://github.com/renkun-ken/formattable) for presenting information in dataframes. Let's use it to look at the characteristics of the top 10 countries with the highest scores for their open data sharing policies:
+
+
+
+```{r,message = F,warning = F }
+
+#making nice table to get relationship between happiness and openness
+library(formattable)
+
+open_happy %>%
+  arrange(desc(openness)) %>%
+  mutate_each(funs(round(., 2)), -c(country,openness)) %>%
+  head(10) %>%
+  formattable(list(
+    openness = color_bar("yellow"),
+    happiness = color_bar("lightgreen"),
+      gdp = color_bar("deepskyblue"),
+    family = color_bar("deepskyblue"),
+    health = color_bar("deepskyblue"),
+    freedom = color_bar("deepskyblue"),
+    goverment = color_bar("deepskyblue"),
+    generosity = color_bar("deepskyblue"),
+    dyst_residual = color_bar("deepskyblue")
+  ), align = "l")
+```
+Alas!! table suggests that our hypothesis might be true. There is a clear relationship between `Openness` and `hapiness`.
+
+### Are open countries happy countries?
+
+
+Now,we are going to visualize this relationship with the help of linear regression model.
+we will `3` groups of countries.
+
+* **G8**   : This refers to the group of eight highly industrialized nations
+* **BRICS**: It isthe acronym coined for an association of five major emerging national economies: Brazil,                   Russia, India, China and South Africa
+* **ASEAN**: This is the Association of Southeast Asian Nations has 10 member states, one candidate member state, and one observer state.
+
+
+
+```{r,message = F,warning = F }
+#countries group
+
+g8 <- c("Canada","France","Germany","Italy","Japan","United Kingdom","United States","Russia")
+brics <- c("India","China","South Africa","Brazil","Russia")
+asean <- c("Brunei", "Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar","Philippines", "Singapore", "Thailand","Vietnam")
+
+#some changes for plotting the graph
+rownames(open_happy) <- open_happy$country
+
+#Is Happiness related with openness?
+
+ggplot(open_happy, 
+       aes(x = openness, 
+           y = happiness)) +
+  geom_point() +
+  geom_point(data = open_happy[g8,],aes(colour = "G8"),size = 5) +
+  geom_point(data = open_happy[brics,],aes(colour = "BRICS"),size = 5) +
+  geom_point(data = open_happy[asean,],aes(colour = "ASEAN"),size = 5) +
+  geom_smooth(method="lm") +
+  labs(x = "Openness Score",
+       y = "Happiness Score",
+       title = "Are open data friendly countries happy countries?",
+       subtitle = "Data openness and happiness by country in 2015") +
+    theme_minimal() +
+  theme(text = element_text(size=16))
+```
+
+It looks like that most off **G8** countries are more happier and open about their data than **ASEAN,BRICS** group countries. 
+
+
+### What other measures are correlated with "Openness"?
+
+```{r,message = F,warning = F }
+open_data_corr <- open_happy %>%
+  select(openness, happiness, gdp, family, health, 
+         freedom,goverment,generosity, dyst_residual) %>%
+  mutate(openness = as.numeric(openness))
+
+od_corr <- cor(open_data_corr, use = "complete", method = "pearson")
+
+corrplot(od_corr)
+```
+
+Hope you enjoyed this analysis between datas from different sources.
